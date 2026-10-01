@@ -6,6 +6,9 @@
   <title>آية AR</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@700&family=Scheherazade+New:wght@700&display=swap" rel="stylesheet">
 
   <style>
     body { margin: 0; overflow: hidden; }
@@ -88,8 +91,8 @@
     /* ============================================================
        ✏️ غيّر الآية من هنا بس
        ============================================================ */
-    const VERSE = "أنا عندي رجاء لأني بإيماني أرتبط برب العظمة الذي لا ينساني";
-    const REF   = "إشعياء ٤٩ : ١٥";
+    const VERSE = "لِتَصِرْ كُلُّ أُمُورِكُمْ فِي مَحَبَّةٍ";
+    const REF   = "(كو1 14:16)";
     /* ============================================================ */
 
     const target     = document.getElementById("target");
@@ -109,23 +112,52 @@
       x.textBaseline = "middle";
       x.direction = "rtl";
 
-      const lines = wrapText(x, verse, 820);
-      const fs = lines.length > 2 ? 60 : 70;
-      x.font = "bold " + fs + "px 'Traditional Arabic', 'Amiri', Tahoma, serif";
+      const lines = wrapText(x, verse, 840);
+      const fs = lines.length > 2 ? 72 : 92;   // نص أكبر لأن الآية أقصر
+      const fontStack = "'Scheherazade New', 'Amiri', 'Noto Naskh Arabic', 'Traditional Arabic', serif";
+      x.font = "700 " + fs + "px " + fontStack;
 
-      // ظل أبيض ناعم حوالين الحروف عشان تتقرأ بوضوح فوق السحابة
-      x.shadowColor = "rgba(255,255,255,0.95)";
-      x.shadowBlur = 14;
-      x.fillStyle = "#3a2a6d";
+      const startY = 260 - ((lines.length - 1) * fs * 1.45) / 2;
 
-      const startY = 270 - ((lines.length - 1) * fs * 1.5) / 2;
-      lines.forEach((ln, i) => x.fillText(ln, 512, startY + i * fs * 1.5));
+      // تدرّج لوني دافئ للنص (ذهبي-بنفسجي) بدل لون واحد مسطح
+      const grad = x.createLinearGradient(0, startY - fs, 0, startY + lines.length * fs * 1.45);
+      grad.addColorStop(0, "#6a3fb5");
+      grad.addColorStop(0.5, "#8a3fc9");
+      grad.addColorStop(1, "#b5389a");
 
-      // المرجع تحت بلون مختلف هادئ
-      x.shadowBlur = 10;
-      x.font = "bold 38px Tahoma, Arial";
+      lines.forEach((ln, i) => {
+        const ly = startY + i * fs * 1.45;
+
+        // هالة بيضاء ناعمة وواسعة عشان الوضوح فوق السحابة
+        x.shadowColor = "rgba(255,255,255,0.98)";
+        x.shadowBlur = 22;
+        x.lineWidth = 10;
+        x.strokeStyle = "rgba(255,255,255,0.9)";
+        x.strokeText(ln, 512, ly);
+
+        // النص نفسه بتدرّج لوني وبريق خفيف
+        x.shadowColor = "rgba(255, 215, 120, 0.55)";
+        x.shadowBlur = 16;
+        x.fillStyle = grad;
+        x.fillText(ln, 512, ly);
+      });
+
+      // خط زخرفي رفيع تحت الآية
+      const lastY = startY + (lines.length - 1) * fs * 1.45 + fs * 0.95;
+      x.shadowBlur = 0;
+      x.strokeStyle = "rgba(181,56,154,0.55)";
+      x.lineWidth = 3;
+      x.beginPath();
+      x.moveTo(512 - 130, lastY);
+      x.lineTo(512 + 130, lastY);
+      x.stroke();
+
+      // المرجع تحت بخط أهدأ وأصغر
+      x.shadowColor = "rgba(255,255,255,0.9)";
+      x.shadowBlur = 8;
+      x.font = "600 36px Tahoma, Arial";
       x.fillStyle = "#8a5fb0";
-      x.fillText(ref, 512, 480);
+      x.fillText(ref, 512, lastY + 46);
 
       return c;
     }
@@ -167,7 +199,8 @@
 
     /* ---------- تركيب النسيج على الـ Planes ---------- */
     const scene = document.querySelector("a-scene");
-    scene.addEventListener("loaded", () => {
+
+    function buildTextures() {
       const cloudTex = new THREE.CanvasTexture(makeCloudTexture());
       cloud.getObject3D("mesh").material.map = cloudTex;
       cloud.getObject3D("mesh").material.needsUpdate = true;
@@ -176,6 +209,18 @@
       verseTex.anisotropy = 4;
       versePlane.getObject3D("mesh").material.map = verseTex;
       versePlane.getObject3D("mesh").material.needsUpdate = true;
+    }
+
+    scene.addEventListener("loaded", () => {
+      // نستنى الخطوط العربية تتحمّل الأول عشان الآية ما ترجعش لخط افتراضي
+      if (document.fonts && document.fonts.ready) {
+        Promise.all([
+          document.fonts.load("700 90px 'Amiri'"),
+          document.fonts.load("700 90px 'Scheherazade New'")
+        ]).then(() => document.fonts.ready).then(buildTextures).catch(buildTextures);
+      } else {
+        buildTextures();
+      }
     });
 
     /* ============================================================
