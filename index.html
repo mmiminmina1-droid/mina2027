@@ -28,6 +28,25 @@
       animation: scan 2s ease-in-out infinite alternate;
     }
     @keyframes scan { from { top: 6%; } to { top: 94%; } }
+
+    /* ===== الجزيئات المتطايرة (نجوم/ورود/قلوب) ===== */
+    .deco {
+      position: fixed;
+      z-index: 20;
+      pointer-events: none;
+      font-size: 28px;
+      will-change: transform, opacity;
+    }
+    @keyframes decoBurst {
+      from { opacity: 1; transform: translate(0,0) scale(1) rotate(0deg); }
+      to   { opacity: 0; transform: translate(var(--x), var(--y)) scale(0.3) rotate(260deg); }
+    }
+    @keyframes decoDrift {
+      0%   { opacity: 0; transform: translate(0,0) scale(0.6); }
+      15%  { opacity: 0.9; }
+      85%  { opacity: 0.9; }
+      100% { opacity: 0; transform: translate(var(--x), var(--y)) scale(1); }
+    }
   </style>
 </head>
 
@@ -43,20 +62,23 @@
 
     <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-    <!-- التارجيت: الآية والسحابة مثبتين عليه -->
+    <!-- التارجيت: السحابة والآية مثبتين عليه -->
     <a-entity id="target" mindar-image-target="targetIndex: 0">
 
-      <!-- السحابة البيضاء — بتطفو بطيء (7 ثواني لكل اتجاه) -->
+      <!-- السحابة البيضاء — بتطفو ببطء وتظهر بنطّة لطيفة -->
       <a-plane id="cloud" visible="false"
-        position="0 -0.15 0" width="1.15" height="0.6"
+        position="0 -0.17 0" width="1.25" height="0.68" scale="0 0 0"
         material="transparent: true; depthWrite: false"
-        animation="property: position; from: 0 -0.17 0; to: 0 -0.11 0; dur: 7000; easing: easeInOutSine; loop: true; dir: alternate">
+        animation__pop="property: scale; from: 0 0 0; to: 1 1 1; dur: 900; easing: easeOutBack; startEvents: appear"
+        animation__float="property: position; from: 0 -0.19 0; to: 0 -0.13 0; dur: 6000; easing: easeInOutSine; loop: true; dir: alternate; delay: 900">
       </a-plane>
 
-      <!-- الآية داخل برواز دهبي — في الثلث الأخير من التارجيت -->
+      <!-- الآية مرسومة فوق السحابة مباشرة، بدون برواز -->
       <a-plane id="versePlane" visible="false"
-        position="0 -0.15 0.015" width="0.95" height="0.5"
-        material="transparent: true; depthWrite: false">
+        position="0 -0.17 0.015" width="1.05" height="0.55" scale="0 0 0"
+        material="transparent: true; depthWrite: false"
+        animation__pop="property: scale; from: 0 0 0; to: 1 1 1; dur: 900; easing: easeOutBack; startEvents: appear; delay: 150"
+        animation__float="property: position; from: 0 -0.19 0.015; to: 0 -0.13 0.015; dur: 6000; easing: easeInOutSine; loop: true; dir: alternate; delay: 900">
       </a-plane>
 
     </a-entity>
@@ -77,36 +99,33 @@
     const bgm        = document.getElementById("bgm");
     bgm.volume = 0.55;
 
-    /* ---------- رسم الآية على كانفس (عشان الخط العربي يطلع مظبوط) ---------- */
+    /* ---------- رسم الآية على كانفس (بدون برواز، فوق السحابة مباشرة) ---------- */
     function makeVerseTexture(verse, ref) {
       const c = document.createElement("canvas");
       c.width = 1024; c.height = 560;
       const x = c.getContext("2d");
 
-      // برواز دهبي مزدوج
-      x.strokeStyle = "#d4af37";
-      x.lineWidth = 14;
-      roundRect(x, 22, 22, 980, 516, 36); x.stroke();
-      x.lineWidth = 4;
-      roundRect(x, 48, 48, 928, 464, 24); x.stroke();
-
-      // النص
-      x.fillStyle = "#4a2c14";
       x.textAlign = "center";
       x.textBaseline = "middle";
       x.direction = "rtl";
 
-      const lines = wrapText(x, verse, 860);
-      const fs = lines.length > 2 ? 58 : 68;
+      const lines = wrapText(x, verse, 820);
+      const fs = lines.length > 2 ? 60 : 70;
       x.font = "bold " + fs + "px 'Traditional Arabic', 'Amiri', Tahoma, serif";
 
-      const startY = 280 - ((lines.length - 1) * fs * 1.5) / 2;
+      // ظل أبيض ناعم حوالين الحروف عشان تتقرأ بوضوح فوق السحابة
+      x.shadowColor = "rgba(255,255,255,0.95)";
+      x.shadowBlur = 14;
+      x.fillStyle = "#3a2a6d";
+
+      const startY = 270 - ((lines.length - 1) * fs * 1.5) / 2;
       lines.forEach((ln, i) => x.fillText(ln, 512, startY + i * fs * 1.5));
 
-      // المرجع تحت
-      x.font = "bold 40px Tahoma, Arial";
-      x.fillStyle = "#8b6914";
-      x.fillText(ref, 512, 490);
+      // المرجع تحت بلون مختلف هادئ
+      x.shadowBlur = 10;
+      x.font = "bold 38px Tahoma, Arial";
+      x.fillStyle = "#8a5fb0";
+      x.fillText(ref, 512, 480);
 
       return c;
     }
@@ -124,27 +143,16 @@
       return lines;
     }
 
-    function roundRect(x, px, py, w, h, r) {
-      x.beginPath();
-      x.moveTo(px + r, py);
-      x.arcTo(px + w, py, px + w, py + h, r);
-      x.arcTo(px + w, py + h, px, py + h, r);
-      x.arcTo(px, py + h, px, py, r);
-      x.arcTo(px, py, px + w, py, r);
-      x.closePath();
-    }
-
     /* ---------- رسم السحابة البيضاء ---------- */
     function makeCloudTexture() {
       const c = document.createElement("canvas");
-      c.width = 1024; c.height = 540;
+      c.width = 1024; c.height = 560;
       const x = c.getContext("2d");
 
-      // مجموعة فقاعات بيضاء متدرجة تشكل سحابة
       const puffs = [
-        [512, 300, 300], [300, 330, 190], [730, 330, 200],
-        [420, 240, 170], [620, 235, 165], [200, 360, 130],
-        [830, 360, 135], [512, 380, 260]
+        [512, 310, 310], [290, 340, 195], [740, 340, 205],
+        [420, 245, 175], [630, 240, 170], [190, 375, 135],
+        [840, 375, 140], [512, 395, 270]
       ];
       puffs.forEach(([cx, cy, r]) => {
         const g = x.createRadialGradient(cx, cy, r * 0.1, cx, cy, r);
@@ -170,13 +178,70 @@
       versePlane.getObject3D("mesh").material.needsUpdate = true;
     });
 
+    /* ============================================================
+       الزخرفة المتطايرة: نجوم + ورود + قلوب
+       ============================================================ */
+    const DECO_ICONS = ["⭐", "✨", "🌸", "🌺", "💖", "💗", "🌟"];
+
+    // دفعة زخرفة تتفرقع من نص الشاشة لحظة ظهور الآية
+    function decoBurst(count = 18) {
+      const cx = innerWidth / 2, cy = innerHeight / 2;
+      for (let i = 0; i < count; i++) {
+        const el = document.createElement("div");
+        el.className = "deco";
+        el.textContent = DECO_ICONS[Math.floor(Math.random() * DECO_ICONS.length)];
+        el.style.left = cx + "px";
+        el.style.top = cy + "px";
+        el.style.fontSize = (20 + Math.random() * 18) + "px";
+        const angle = (Math.PI * 2 * i) / count + Math.random() * 0.3;
+        const dist = 90 + Math.random() * 140;
+        el.style.setProperty("--x", Math.cos(angle) * dist + "px");
+        el.style.setProperty("--y", Math.sin(angle) * dist + "px");
+        el.style.animation = "decoBurst 1s ease-out forwards";
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 1000);
+      }
+    }
+
+    // رذاذ هادئ مستمر طول ما الآية ظاهرة
+    let driftTimer = null;
+    function startDrift() {
+      stopDrift();
+      driftTimer = setInterval(() => {
+        const el = document.createElement("div");
+        el.className = "deco";
+        el.textContent = DECO_ICONS[Math.floor(Math.random() * DECO_ICONS.length)];
+        const startX = innerWidth * (0.15 + Math.random() * 0.7);
+        const startY = innerHeight * (0.55 + Math.random() * 0.25);
+        el.style.left = startX + "px";
+        el.style.top = startY + "px";
+        el.style.fontSize = (16 + Math.random() * 14) + "px";
+        el.style.setProperty("--x", (Math.random() * 60 - 30) + "px");
+        el.style.setProperty("--y", (-120 - Math.random() * 80) + "px");
+        el.style.animation = "decoDrift 3.2s ease-out forwards";
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 3200);
+      }, 450);
+    }
+    function stopDrift() {
+      if (driftTimer) { clearInterval(driftTimer); driftTimer = null; }
+    }
+
     function playBgm() { bgm.play().catch(() => {}); }
 
     // ===== لما التارجيت يتعرف =====
     target.addEventListener("targetFound", () => {
       scanner.style.display = "none";
+
+      cloud.setAttribute("scale", "0 0 0");
+      versePlane.setAttribute("scale", "0 0 0");
       cloud.setAttribute("visible", "true");
       versePlane.setAttribute("visible", "true");
+      cloud.emit("appear");
+      versePlane.emit("appear");
+
+      decoBurst();
+      startDrift();
       playBgm();
     });
 
@@ -185,6 +250,7 @@
       scanner.style.display = "block";
       cloud.setAttribute("visible", "false");
       versePlane.setAttribute("visible", "false");
+      stopDrift();
       bgm.pause();
     });
 
